@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบข้อสอบออนไลน์</title>
+<style>
+  :root { --maroon:#7B1E2B; --maroon-dark:#5c1620; --maroon-light:#a83547; --bg:#f5f2f0; --line:#e0d8d6; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Sarabun','Segoe UI',sans-serif; background:var(--bg); color:#2a2a2a; line-height:1.6; }
+  .wrap { max-width:720px; margin:0 auto; padding:16px; }
+  .card { background:#fff; border-radius:14px; box-shadow:0 2px 12px rgba(0,0,0,.06); padding:28px; margin-top:24px; }
+  h1 { color:var(--maroon); font-size:1.5rem; margin-bottom:4px; }
+  .sub { color:#888; font-size:.9rem; margin-bottom:20px; }
+  label { display:block; font-weight:600; margin:14px 0 6px; }
+  input[type=text] { width:100%; padding:12px 14px; border:1.5px solid var(--line); border-radius:9px; font-size:1rem; font-family:inherit; }
+  input[type=text]:focus { outline:none; border-color:var(--maroon-light); }
+  .btn { background:var(--maroon); color:#fff; border:none; padding:13px 26px; border-radius:9px; font-size:1rem; font-weight:600; cursor:pointer; font-family:inherit; transition:.15s; }
+  .btn:hover { background:var(--maroon-dark); }
+  .btn:disabled { background:#bbb; cursor:not-allowed; }
+  .btn-ghost { background:#fff; color:var(--maroon); border:1.5px solid var(--maroon); }
+  .btn-ghost:hover { background:#faf3f4; }
+  .topbar { position:sticky; top:0; background:var(--maroon); color:#fff; padding:12px 16px; border-radius:0 0 12px 12px; display:flex; justify-content:space-between; align-items:center; z-index:10; box-shadow:0 2px 8px rgba(0,0,0,.15); }
+  .topbar .title { font-weight:600; font-size:.95rem; }
+  .timer { font-weight:700; font-size:1.05rem; background:rgba(255,255,255,.18); padding:4px 12px; border-radius:8px; }
+  .timer.warn { background:#ffd24d; color:#5c1620; animation:pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity:.6; } }
+  .progress-wrap { background:var(--line); height:8px; border-radius:6px; overflow:hidden; margin:18px 0; }
+  .progress-bar { background:var(--maroon); height:100%; transition:width .3s; }
+  .qnum { color:var(--maroon-light); font-weight:700; font-size:.9rem; margin-bottom:8px; }
+  .qtext { font-size:1.15rem; font-weight:600; margin-bottom:20px; }
+  .choice { display:flex; align-items:flex-start; gap:12px; padding:14px 16px; border:1.5px solid var(--line); border-radius:11px; margin-bottom:11px; cursor:pointer; transition:.12s; }
+  .choice:hover { border-color:var(--maroon-light); background:#faf6f6; }
+  .choice.selected { border-color:var(--maroon); background:#f7ecee; }
+  .choice .marker { width:28px; height:28px; min-width:28px; border-radius:50%; border:2px solid var(--line); display:flex; align-items:center; justify-content:center; font-weight:700; color:#999; }
+  .choice.selected .marker { background:var(--maroon); border-color:var(--maroon); color:#fff; }
+  .nav { display:flex; justify-content:space-between; gap:12px; margin-top:24px; }
+  .hidden { display:none; }
+  .center { text-align:center; }
+  .big-score { font-size:2.6rem; font-weight:800; color:var(--maroon); margin:14px 0; }
+  .msg { padding:14px 16px; border-radius:10px; margin:14px 0; font-weight:500; }
+  .msg.err { background:#fdecea; color:#a8242a; border:1px solid #f3c0bd; }
+  .summary-item { display:inline-block; background:#f7ecee; color:var(--maroon-dark); padding:4px 10px; border-radius:7px; margin:3px; font-weight:600; font-size:.9rem; }
+  .spinner { width:38px; height:38px; border:4px solid var(--line); border-top-color:var(--maroon); border-radius:50%; animation:spin .8s linear infinite; margin:20px auto; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="page-login" class="card">
+    <h1>ระบบข้อสอบออนไลน์</h1>
+    <div class="sub">กรุณากรอกข้อมูลเพื่อเริ่มทำข้อสอบ</div>
+    <label for="sname">ชื่อ-นามสกุล</label>
+    <input type="text" id="sname" placeholder="เช่น สมชาย ใจดี" autocomplete="off">
+    <label for="sid">รหัสนิสิต</label>
+    <input type="text" id="sid" placeholder="เช่น 6601234567" autocomplete="off" inputmode="numeric">
+    <div id="login-msg"></div>
+    <div style="margin-top:22px;">
+      <button class="btn" id="btn-start">เริ่มทำข้อสอบ</button>
+    </div>
+  </div>
+
+  <div id="page-loading" class="card center hidden">
+    <div class="spinner"></div>
+    <div>กำลังโหลดข้อสอบ...</div>
+  </div>
+
+  <div id="page-quiz" class="hidden">
+    <div class="topbar">
+      <span class="title" id="quiz-title">—</span>
+      <span class="timer" id="timer">--:--</span>
+    </div>
+    <div class="card">
+      <div class="progress-wrap"><div class="progress-bar" id="progress"></div></div>
+      <div class="qnum" id="qnum">ข้อ 1</div>
+      <div class="qtext" id="qtext">—</div>
+      <div id="choices"></div>
+      <div class="nav">
+        <button class="btn btn-ghost" id="btn-prev">ก่อนหน้า</button>
+        <button class="btn" id="btn-next">ถัดไป</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="page-confirm" class="card hidden">
+    <h1>ยืนยันการส่งข้อสอบ</h1>
+    <div class="sub">ตรวจสอบก่อนส่ง — เมื่อส่งแล้วไม่สามารถแก้ไขได้</div>
+    <div id="confirm-summary"></div>
+    <div class="nav">
+      <button class="btn btn-ghost" id="btn-back-quiz">กลับไปทบทวน</button>
+      <button class="btn" id="btn-submit">ส่งข้อสอบ</button>
+    </div>
+  </div>
+
+  <div id="page-result" class="card center hidden">
+    <h1>ส่งข้อสอบเรียบร้อย</h1>
+    <div class="sub">คะแนนของท่าน</div>
+    <div class="big-score" id="result-score">— / —</div>
+    <div id="result-name" style="color:#666;"></div>
+    <div style="margin-top:24px; color:#888;">ขอบคุณที่ทำข้อสอบ 🎓</div>
+  </div>
+
+</div>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbwT50BatbNw1U_H-ufE_nY3NnIHasal6xt22I2ZlprQzOe24OqufERWQoGmlG9G6sRr/exec";
+
+let CONFIG = null, QUESTIONS = [], ORDER = [], CHOICE_ORDER = {}, ANSWERS = {};
+let curIdx = 0, timeLeft = 0, timerHandle = null, startTime = 0, submitted = false;
+let STUDENT = { id:"", name:"" };
+
+function hashSeed(str){ let h=1779033703^str.length; for(let i=0;i<str.length;i++){ h=Math.imul(h^str.charCodeAt(i),3432918353); h=h<<13|h>>>19; } return function(){ h=Math.imul(h^h>>>16,2246822507); h=Math.imul(h^h>>>13,3266489909); return (h^=h>>>16)>>>0; }; }
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function seededRandom(seedStr){ return mulberry32(hashSeed(seedStr)()); }
+function seededShuffle(arr, seedStr){
+  const a = arr.slice(); const rnd = seededRandom(seedStr);
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+
+function show(id){ ["page-login","page-loading","page-quiz","page-confirm","page-result"].forEach(p=>{ document.getElementById(p).classList.toggle("hidden", p!==id); }); }
+function setMsg(el, text){ document.getElementById(el).innerHTML = text ? '<div class="msg err">'+text+'</div>' : ''; }
+
+document.getElementById("btn-start").onclick = async function(){
+  const name = document.getElementById("sname").value.trim();
+  const id = document.getElementById("sid").value.trim();
+  setMsg("login-msg","");
+  if(!name || !id){ setMsg("login-msg","กรุณากรอกชื่อและรหัสนิสิตให้ครบ"); return; }
+  STUDENT = { id, name };
+  this.disabled = true;
+  show("page-loading");
+
+  try {
+    const res = await fetch(API_URL + "?action=getQuestions");
+    const data = await res.json();
+    if(!data.ok){
+      show("page-login"); this.disabled = false;
+      setMsg("login-msg", data.message || "ไม่สามารถโหลดข้อสอบได้");
+      return;
+    }
+    CONFIG = data.config;
+    QUESTIONS = data.questions;
+
+    const shuffledQ = seededShuffle(QUESTIONS, id);
+    ORDER = shuffledQ.map(q => q.id);
+
+    CHOICE_ORDER = {};
+    shuffledQ.forEach(q => {
+      const labels = ["a","b","c","d"].filter(L => q.choices[L] != null && q.choices[L] !== "");
+      CHOICE_ORDER[q.id] = seededShuffle(labels, id + "_q" + q.id);
+    });
+
+    document.getElementById("quiz-title").textContent = CONFIG.exam_title || "ข้อสอบ";
+    curIdx = 0;
+    startTimer(CONFIG.time_limit_min);
+    startTime = Date.now();
+    show("page-quiz");
+    renderQuestion();
+  } catch(err){
+    show("page-login"); this.disabled = false;
+    setMsg("login-msg","เกิดข้อผิดพลาดในการเชื่อมต่อ: " + err.message);
+  }
+};
+
+function startTimer(minutes){
+  timeLeft = Math.round(minutes * 60);
+  updateTimerUI();
+  timerHandle = setInterval(()=>{
+    timeLeft--;
+    updateTimerUI();
+    if(timeLeft <= 0){ clearInterval(timerHandle); autoSubmit(); }
+  }, 1000);
+}
+function updateTimerUI(){
+  const m = Math.floor(timeLeft/60), s = timeLeft%60;
+  const el = document.getElementById("timer");
+  el.textContent = String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");
+  el.classList.toggle("warn", timeLeft <= 60);
+}
+
+function getQById(id){ return QUESTIONS.find(q => q.id === id); }
+function renderQuestion(){
+  const qid = ORDER[curIdx];
+  const q = getQById(qid);
+  document.getElementById("qnum").textContent = "ข้อ " + (curIdx+1) + " / " + ORDER.length;
+  document.getElementById("qtext").textContent = q.question;
+  document.getElementById("progress").style.width = ((curIdx+1)/ORDER.length*100) + "%";
+
+  const box = document.getElementById("choices");
+  box.innerHTML = "";
+  const order = CHOICE_ORDER[qid];
+  order.forEach((origLabel, displayPos) => {
+    const div = document.createElement("div");
+    div.className = "choice" + (ANSWERS[qid] === origLabel ? " selected" : "");
+    const displayLetter = String.fromCharCode(65 + displayPos);
+    div.innerHTML = '<div class="marker">'+displayLetter+'</div><div>'+q.choices[origLabel]+'</div>';
+    div.onclick = () => {
+      ANSWERS[qid] = origLabel;
+      renderQuestion();
+    };
+    box.appendChild(div);
+  });
+
+  document.getElementById("btn-prev").style.visibility = curIdx === 0 ? "hidden" : "visible";
+  document.getElementById("btn-next").textContent = (curIdx === ORDER.length-1) ? "ตรวจทาน → ส่ง" : "ถัดไป";
+}
+
+document.getElementById("btn-prev").onclick = ()=>{ if(curIdx>0){ curIdx--; renderQuestion(); } };
+document.getElementById("btn-next").onclick = ()=>{
+  if(curIdx < ORDER.length-1){ curIdx++; renderQuestion(); }
+  else showConfirm();
+};
+
+function showConfirm(){
+  const unanswered = ORDER.map((id,i)=> ANSWERS[id]==null ? (i+1) : null).filter(x=>x!==null);
+  let html = "";
+  if(unanswered.length === 0){
+    html = '<div class="msg" style="background:#eaf6ec;color:#2e7d32;border:1px solid #b6dcbb;">ท่านตอบครบทุกข้อแล้ว ('+ORDER.length+' ข้อ)</div>';
+  } else {
+    html = '<div class="msg err">ยังมีข้อที่ยังไม่ได้ตอบ '+unanswered.length+' ข้อ:</div><div>'
+         + unanswered.map(n=>'<span class="summary-item">ข้อ '+n+'</span>').join('') + '</div>';
+  }
+  document.getElementById("confirm-summary").innerHTML = html;
+  show("page-confirm");
+}
+document.getElementById("btn-back-quiz").onclick = ()=>{ show("page-quiz"); renderQuestion(); };
+document.getElementById("btn-submit").onclick = function(){ doSubmit(false); };
+
+function autoSubmit(){
+  if(submitted) return;
+  alert("หมดเวลาทำข้อสอบ ระบบจะส่งคำตอบที่มีอยู่อัตโนมัติ");
+  doSubmit(true);
+}
+
+async function doSubmit(isAuto){
+  if(submitted) return;
+  submitted = true;
+  if(timerHandle) clearInterval(timerHandle);
+  const btn = document.getElementById("btn-submit");
+  if(btn) btn.disabled = true;
+  show("page-loading");
+
+  const durationSec = Math.round((Date.now() - startTime)/1000);
+  const payload = {
+    student_id: STUDENT.id,
+    student_name: STUDENT.name,
+    answers: ANSWERS,
+    question_order: ORDER,
+    choice_order: CHOICE_ORDER,
+    duration_sec: durationSec
+  };
+
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if(!data.ok){
+      document.getElementById("page-result").innerHTML =
+        '<h1 style="color:#a8242a;">ไม่สามารถส่งข้อสอบได้</h1><div class="msg err">'+(data.message||"เกิดข้อผิดพลาด")+'</div>';
+      show("page-result");
+      return;
+    }
+    document.getElementById("result-score").textContent = data.score + " / " + data.max_score;
+    document.getElementById("result-name").textContent = STUDENT.name + " (" + STUDENT.id + ")";
+    show("page-result");
+  } catch(err){
+    submitted = false;
+    if(btn) btn.disabled = false;
+    document.getElementById("confirm-summary").innerHTML =
+      '<div class="msg err">ส่งไม่สำเร็จ: '+err.message+' กรุณาลองใหม่</div>';
+    show("page-confirm");
+  }
+}
+
+window.addEventListener("beforeunload", function(e){
+  if(!submitted && CONFIG){ e.preventDefault(); e.returnValue = ""; }
+});
+</script>
+</body>
+</html>
